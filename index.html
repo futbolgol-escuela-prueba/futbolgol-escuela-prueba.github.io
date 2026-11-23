@@ -178,6 +178,7 @@ label.f{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:1
 .dots{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:#E3E6EE}
 .dot.si{background:#1E9E5A}.dot.no{background:var(--red)}
+.ic.w{background:#FFF4DE;color:#B45309}
 .yn-big b{display:block;text-align:left;padding:12px 14px;border-radius:12px;font-size:14px}
 </style>
 </head>
@@ -277,6 +278,7 @@ var ICON = {
   user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 16 0v1"/></svg>',
   save:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>',
   out:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
   eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   ball:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/></svg>'
 };
@@ -2797,8 +2799,7 @@ function vInicio(){
     '<button class="qa" onclick="go(\'chicos\')"><span class="ic r">'+ICON.kids+'</span>Chicos</button>'+
     (sinPlata()?'<button class="qa" onclick="Solicitudes.open()"><span class="ic g">'+ICON.plus+'</span>Inscripciones</button>':'<button class="qa" onclick="go(\'cobrar\')"><span class="ic g">'+ICON.cash+'</span>Deudores</button>')+
     '<button class="qa" onclick="go(\'grupos\')"><span class="ic b">'+ICON.grid+'</span>Grupos</button></div>';
-  var np = (d.solicitudes||[]).length;
-  if(np) html += '<div class="item" style="margin:0 0 14px;border:1.5px solid #F5C26B;background:#FFF8EB" onclick="Solicitudes.open()"><div class="sec-icon ic r">'+ICON.plus+'</div><div class="main"><div class="t">'+np+(np===1?' inscripción online para revisar':' inscripciones online para revisar')+'</div><div class="s">Las completaron las familias desde el link</div></div><span class="pill warn">Ver</span></div>';
+  html += paraHoyHtml();
   html += clasesHoyHtml();
   if(sinPlata()){
     html += '<div class="grid g2 g4">'+sedes.map(function(s){ return kpi(d.chicos.filter(function(c){ return c.sede===s.id && c.activo; }).length, esc(s.nombre), ''); }).join('')+'</div>';
@@ -3754,6 +3755,34 @@ function asistenciaFichaHtml(c){
   if(!as.ultimas.length) return '<div class="group-title">Asistencia</div><div class="empty" style="padding:12px">Todavía no hay listas tomadas.</div>';
   return '<div class="group-title">Asistencia</div><div class="kv" style="margin-top:0"><span>Últimos 30 días</span><b>'+(as.total?as.presentes+' de '+as.total+' clases ('+as.pct+'%)':'—')+'</b>'+
     '<span>Últimas clases</span><span class="dots">'+as.ultimas.slice().reverse().map(function(a){ return '<i class="dot '+(a.p?'si':'no')+'" title="'+fdate(a.f)+'"></i>'; }).join('')+'</span></div>';
+}
+
+/* ================= Inicio: para hacer hoy ================= */
+function paraHoyHtml(){
+  var d=D(), it=[];
+  var activos=d.chicos.filter(function(c){ return c.activo; });
+  if(d.vePlata){
+    var deben=activos.filter(function(c){ return !c.pagoMes; });
+    if(deben.length){
+      var tot=deben.reduce(function(a,c){ return a+montoHoy(c); },0);
+      it.push({cls:'r',ic:ICON.cash,t:deben.length+(deben.length===1?' chico debe ':' chicos deben ')+mesNombre(d.mesActual).split(' ')[0].toLowerCase(),
+        s:money(tot)+(d.diaHoy>15?' · ya con recargo':' · el recargo arranca el 16'),btn:canEdit()?'Cobrar':'Ver',go:"go('cobrar')"});
+    }
+  }
+  var np=(d.solicitudes||[]).length;
+  if(np) it.push({cls:'w',ic:ICON.plus,t:np+(np===1?' inscripción para revisar':' inscripciones para revisar'),s:'Las completaron las familias desde el link',btn:'Revisar',go:'Solicitudes.open()'});
+  var sinApto=activos.filter(function(c){ return !c.apto; }).length;
+  if(sinApto) it.push({cls:'w',ic:ICON.kids,t:sinApto+(sinApto===1?' chico sin apto físico':' chicos sin apto físico'),s:'Pediselo a la familia',btn:'Ver',go:"S.chicosFiltro='apto';go('chicos')"});
+  if(d.puedeTomarLista){
+    var ahora=('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
+    var faltan=clasesHoy().filter(function(x){ return x.h.inicio<=ahora && !listasDe(x.g.id).some(function(y){ return y.f===d.hoy; }); });
+    if(faltan.length) it.push({cls:'w',ic:ICON.grid,t:faltan.length+(faltan.length===1?' lista de hoy sin tomar':' listas de hoy sin tomar'),s:faltan.map(function(x){ return x.h.inicio+' '+(x.g.nombre||'Grupo'); }).join(' · '),btn:'Tomar',go:"Lista.open('"+faltan[0].g.id+"')"});
+  }
+  var h='<div class="group-title">Para hacer hoy</div>';
+  if(!it.length) return h+'<div class="item" style="cursor:default;margin-bottom:14px"><div class="sec-icon ic g">'+ICON.check+'</div><div class="main"><div class="t">Todo al día</div><div class="s">No hay pendientes por ahora</div></div></div>';
+  return h+'<div class="list" style="margin-bottom:14px">'+it.map(function(x){
+    return '<div class="item" onclick="'+x.go+'"><div class="sec-icon ic '+(x.cls==='w'?'w':x.cls)+'">'+x.ic+'</div><div class="main"><div class="t">'+x.t+'</div><div class="s">'+esc(x.s)+'</div></div><span class="pill '+(x.cls==='r'?'bad':'warn')+'">'+x.btn+'</span></div>';
+  }).join('')+'</div>';
 }
 
 /* ================= Inicio ================= */
